@@ -7,7 +7,6 @@ public class Book {
 
     HashMap<Double, OrdersAtPrice> ordersAtPriceHashMap = new HashMap<>();
 
-
     public void add(String orderId, String side, Double price, Double volume) {
         Order newOrder = new Order(orderId, side, price, volume, null, null);
         addOrder(newOrder);
@@ -40,8 +39,6 @@ public class Book {
             } else {
                 ordersAtPrice.firstOrder = order;
             }
-
-
         }
     }
 
@@ -61,7 +58,6 @@ public class Book {
         }
     }
 
-
     private void addOrdersAtPrice(OrdersAtPrice newOrdersAtPrice) {
 
         ordersAtPriceHashMap.put(newOrdersAtPrice.price, newOrdersAtPrice);
@@ -69,7 +65,6 @@ public class Book {
         OrdersAtPrice bestOrdersByPrice = (newOrdersAtPrice.side.equals("B")) ? bidsByPrice : asksByPrice;
 
         if (bestOrdersByPrice == null) {
-
             if (newOrdersAtPrice.side.equals("B")) {
                 bidsByPrice = newOrdersAtPrice;
             } else {
@@ -123,7 +118,6 @@ public class Book {
 
                     target.nextEntry = (target.nextEntry == bestOrdersByPrice ? newOrdersAtPrice : target.nextEntry);
 
-
                     if (newOrdersAtPrice.side.equals("B")) {
                         bidsByPrice = newOrdersAtPrice;
                     } else {
@@ -132,10 +126,7 @@ public class Book {
 
                 }
             }
-
-
         }
-
     }
 
     private void removeOrdersAtPrice(String side, Double price) {
@@ -150,7 +141,6 @@ public class Book {
                 asksByPrice = null;
             }
         } else {
-
             ordersAtPrice.prevEntry.nextEntry = ordersAtPrice.nextEntry;
             ordersAtPrice.nextEntry.prevEntry = ordersAtPrice.prevEntry;
 
@@ -164,17 +154,14 @@ public class Book {
 
         }
         ordersAtPriceHashMap.remove(price);
-
     }
 
     @Override
     public String toString() {
 
-
         StringBuilder sb = new StringBuilder();
         sb.append("Starting with the highest SELL price");
         sb.append(System.getProperty("line.separator"));
-
 
         OrdersAtPrice lowestAsk = asksByPrice;
         if (lowestAsk != null) {
@@ -184,24 +171,19 @@ public class Book {
             sb.append(System.getProperty("line.separator"));
 
             OrdersAtPrice temp = highestAsk.prevEntry;
-
             while(temp != highestAsk) {
                 sb.append(temp.toString());
                 temp = temp.prevEntry;
                 sb.append(System.getProperty("line.separator"));
-
             }
-
         } else {
             //no lowest ask
             sb.append("No SELL Orders");
             sb.append(System.getProperty("line.separator"));
-
         }
 
         sb.append("Bid Ask Spread");
         sb.append(System.getProperty("line.separator"));
-
 
         OrdersAtPrice highestBid = bidsByPrice;
         if (bidsByPrice != null) {
@@ -209,27 +191,16 @@ public class Book {
             sb.append(highestBid.toString());
             sb.append(System.getProperty("line.separator"));
 
-
             OrdersAtPrice temp = highestBid.nextEntry;
             while (temp != highestBid) {
                 sb.append(temp.toString());
                 temp = temp.nextEntry;
                 sb.append(System.getProperty("line.separator"));
-
             }
-
-
-
         } else {
             sb.append("No BUY Orders");
             sb.append(System.getProperty("line.separator"));
         }
-
         return sb.toString();
-
-
-
     }
-
-
 }

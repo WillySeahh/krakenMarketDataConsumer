@@ -31,11 +31,6 @@ public class OrdersAtPrice {
             temp = temp.nextOrder;
 
         }
-
         return sb.toString();
-
-
     }
-
-
 }
