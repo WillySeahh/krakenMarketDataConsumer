@@ -14,7 +14,7 @@
     </properties>
 
     <dependencies>
-        <!-- Adapted from: https://github.com/TooTallNate/Java-WebSocket?tab=readme-ov-file-->
+        <!-- Adapted from: https://github.com/TooTallNate/Java-WebSocket?tab=readme-ov-file -->
         <dependency>
             <groupId>org.java-websocket</groupId>
             <artifactId>Java-WebSocket</artifactId>
