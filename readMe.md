@@ -1,7 +1,7 @@
 # Candle 1m Problem
 
 ## Assumptions / Important Context
-1. Chose only 1 symbol/trading pair to build the orderbook and 1m candle. Chosen: **ALGO/USD**
+1. Assume only 1 symbol/trading pair to build the orderbook and 1m candle. Chosen: **ALGO/USD**
 2. Used Kraken's Spot Websocket API v2 (https://docs.kraken.com/api/docs/websocket-v2/book/)
 3. Assumed that the response received has not been tampered with (did not perform CRC checksum on validity of packet)
 4. Since the response of the Kraken uses time format "2022-12-25T09:30:59.123456Z", when we refer to time we also use
@@ -29,7 +29,9 @@ End of candles. Next candles printing in 15s.
 There are 3 main sub problem here, and I will go through how I tackled each sub problem below.
 - Integrate with an exchange (we recommend Kraken) to get tick level data using Websockets
 - Using snapshot and delta messages, build the correct view of the tick level orderbook in memory
+  - Benchmarking in performance - Done below
 - Use this tick level order book data to compute 1m candle data and log the output to console
+- Bonus task: publishing 1m candle to kafka, polling and printing it. - Done below
 
 
 ## Integrate with an exchange to get tick level data using Websockets
@@ -82,16 +84,43 @@ can derive the BestBid/BestAsk (BB BA) from the book, and use it to compute the 
 
 Candles timestamp are rounded down to the minute. 
 
+In `KrakenClient.main` there is a schedules task that runs once every 15s, printing out all the 1m candles sorted
+in descending timestamp. 
+
+> ===================================       
+Printing all 1m candles every 15s       
+Candle{timestamp=2024-10-06T04:12:00Z, open=0.125470, high=0.125470, low=0.125465, close=0.125470, ticks=36}        
+Candle{timestamp=2024-10-06T04:11:00Z, open=0.125465, high=0.125470, low=0.125465, close=0.125470, ticks=17}        
+Candle{timestamp=2024-10-06T04:10:00Z, open=0.125655, high=0.125655, low=0.125465, close=0.125465, ticks=223}       
+Candle{timestamp=2024-10-06T04:09:00Z, open=0.125560, high=0.125670, low=0.125560, close=0.125655, ticks=136}       
+Candle{timestamp=2024-10-06T04:08:00Z, open=0.125565, high=0.125565, low=0.125555, close=0.125560, ticks=58}        
+Candle{timestamp=2024-10-06T04:07:00Z, open=0.125465, high=0.125565, low=0.125465, close=0.125565, ticks=148}       
+Candle{timestamp=2024-10-06T04:06:00Z, open=0.125350, high=0.125470, low=0.125330, close=0.125465, ticks=163}       
+Candle{timestamp=2024-10-06T04:05:00Z, open=0.125460, high=0.125460, low=0.125235, close=0.125350, ticks=315}       
+Candle{timestamp=2024-10-06T04:04:00Z, open=0.125460, high=0.125460, low=0.125460, close=0.125460, ticks=12}        
+End of candles. Next candles printing in 15s.       
+===================================
+
+## Bonus task: Publishing and Polling from Kafka
+Download Kafka, start `zookeper-server-start.sh` passing in zookeper.properties files -> then start another terminal window 
+-> start `kafka-server-start.sh` passing in server.properties files. 
+
+Using default port of localhost:9092, and topic is `1m_Candle`
+
+Publisher:
+Using the same scheduled task that runs every 15s in `KrakenClient.main` it will also publish a kafka message
+similar to what I printed out. 
+
+Consumer:  
+Run `KafkaConsumerClass.main`, it should receive the kafka messages and print out in its own run tab.
+The printed candles should be the same as the one in `KrakenClient` run tab, it should also print once every 15s.
+
 ## Other information
 1. Did perform simple sanity checks such as:
     - Ensure that highest bid < lowest ask when building the tick level order book
-        - When this happens, log it out instead of throwing an exception. 
+        - When this happens, log it out instead of throwing an exception.
 2. There’s always at least one bid and ask present
-    - This should only happens once, upon the very start of the program where the book 
-    is not built yet.
-   - When this happens, log it out instead of throwing an exception. 
-
-
-
-
-
+    - This should only happens once, upon the very start of the program where the book
+      is not built yet.
+    - When this happens, log it out instead of throwing an exception. 
+   

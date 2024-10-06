@@ -7,8 +7,14 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.gson.Gson;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft;
 import org.java_websocket.handshake.ServerHandshake;
@@ -79,6 +85,11 @@ public class KrakenClient extends WebSocketClient {
             }
         }
 
+        updateCandle(data, bestAsk, bestBid);
+        //System.out.println(bookTreeMap.toString());
+    }
+
+    private void updateCandle(KrakenResponseJson.Data data, Double bestAsk, Double bestBid ) {
         if (data.getTimestamp() != null) { // Only update candle for 'tick update' messages
             Instant timestamp = Instant.parse(data.getTimestamp());
             Instant truncatedTimestamp = timestamp.truncatedTo(ChronoUnit.MINUTES);
@@ -96,7 +107,6 @@ public class KrakenClient extends WebSocketClient {
             candle.setClose(currMidPrice);
             candle.setTicks(candle.getTicks()+1);
         }
-        //System.out.println(bookTreeMap.toString());
     }
 
     @Override
@@ -109,34 +119,51 @@ public class KrakenClient extends WebSocketClient {
         System.err.println("an error occurred:" + ex);
     }
 
+    public static Producer<String, String> initiateKafkaProducer() {
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        Producer<String, String> producer = new KafkaProducer<>(props);
+        return producer;
+    }
+
     public static void main(String[] args) throws URISyntaxException {
         // Define the subscription message in JSON format
         String subscriptionMessage = "{\"method\": \"subscribe\", \"params\": {\"channel\": \"book\", \"symbol\": [\"ALGO/USD\"]}}";
+
+        Producer<String, String> producer = initiateKafkaProducer();
+        AtomicReference<ProducerRecord<String, String>> record = new AtomicReference<>(new ProducerRecord<>("1m_Candle", "key", "First kafka produced message"));
+        producer.send(record.get());
 
         try {
             // Create a WebSocket client
             WebSocketClient client = new KrakenClient(new URI("wss://ws.kraken.com/v2"));
 
-            // Connect to the WebSocket server
             client.connectBlocking();
-
             // Send the subscription message after connection is established
             if (client.isOpen()) {
                 client.send(subscriptionMessage);
                 System.out.println("Sent Subscription Message: " + subscriptionMessage);
             }
 
-            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-            scheduler.scheduleAtFixedRate(() -> {
-                System.out.println("===================================");
-                System.out.println("Printing all 1m candles every 15s");
-                for (Map.Entry<String, Candle> entry : candles.entrySet()) {
-                    System.out.println(entry.getValue().toString());
-                }
-                System.out.println("End of candles. Next candles printing in 15s.");
-                System.out.println("===================================");
-            }, 0, 15, TimeUnit.SECONDS);
+            StringBuilder sb = new StringBuilder();
 
+            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+            scheduler.scheduleAtFixedRate(() -> {
+                sb.append("===================================" + '\n');
+                sb.append("Printing all 1m candles every 15s" + '\n');
+                for (Map.Entry<String, Candle> entry : candles.entrySet()) {
+                    sb.append(entry.getValue().toString() + '\n');
+                }
+                sb.append("End of candles. Next candles printing in 15s." + '\n');
+                sb.append("===================================" + '\n');
+                record.set(new ProducerRecord<>("1m_Candle", "key", sb.toString()));
+                producer.send(record.get());
+                System.out.println(sb.toString());
+                sb.setLength(0); // clear string buffer cache, reuse object, reduce GC.
+            }, 0, 15, TimeUnit.SECONDS);
 
         } catch (Exception e) {
             System.err.println("Error connecting to WebSocket: " + e.getMessage());
