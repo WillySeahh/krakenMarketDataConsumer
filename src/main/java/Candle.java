@@ -1,25 +1,21 @@
 public class Candle {
-    private String startTime;
+    private String timestamp;
     private double open;
     private double high;
     private double low;
     private double close;
-    private double volume;
     private int ticks;
 
     public Candle(String startTime) {
-
-        this.startTime = startTime;
+        this.timestamp = startTime;
         this.open = -1.0;
         this.high = Double.MIN_VALUE; // default value
         this.low = Double.MAX_VALUE; // default value
         this.ticks = 0;
-
-
     }
 
-    public String getStartTime() {
-        return startTime;
+    public String getTimestamp() {
+        return timestamp;
     }
 
     public double getOpen() {
@@ -38,16 +34,12 @@ public class Candle {
         return close;
     }
 
-    public double getVolume() {
-        return volume;
-    }
-
     public int getTicks() {
         return ticks;
     }
 
-    public void setStartTime(String startTime) {
-        this.startTime = startTime;
+    public void setTimestamp(String timestamp) {
+        this.timestamp = timestamp;
     }
 
     public void setOpen(double open) {
@@ -66,10 +58,6 @@ public class Candle {
         this.close = close;
     }
 
-    public void setVolume(double volume) {
-        this.volume = volume;
-    }
-
     public void setTicks(int ticks) {
         this.ticks = ticks;
     }
@@ -77,12 +65,11 @@ public class Candle {
     @Override
     public String toString() {
         return "Candle{" +
-                "startTime=" + startTime +
+                "timestamp=" + timestamp +
                 ", open=" + String.format("%.6f", open) +
                 ", high=" + String.format("%.6f",high) +
                 ", low=" + String.format("%.6f", low) +
                 ", close=" + String.format("%.6f", close) +
-                ", volume=" + volume +
                 ", ticks=" + ticks +
                 '}';
     }

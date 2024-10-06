@@ -15,11 +15,11 @@ import org.java_websocket.handshake.ServerHandshake;
 
 public class KrakenClient extends WebSocketClient {
 
-    public Gson gson = new Gson();
+    private Gson gson = new Gson();
 
-    private Book book = new Book();
+    private final OrderBookTreeMap bookTreeMap = new OrderBookTreeMap();
 
-    private static SortedMap<String, Candle> candles = new TreeMap<>(Comparator.reverseOrder());
+    private static final SortedMap<String, Candle> candles = new TreeMap<>(Comparator.reverseOrder());
 
     public KrakenClient(URI serverUri, Draft draft) {
         super(serverUri, draft);
@@ -31,8 +31,7 @@ public class KrakenClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        send("Hello, it is me. Mario :)");
-        System.out.println("new connection opened");
+        System.out.println("New connection opened");
     }
 
     @Override
@@ -45,54 +44,51 @@ public class KrakenClient extends WebSocketClient {
         if (message.contains("heartbeat") || message.contains("error") || message.contains("subscribe")) {
             return;
         }
-        System.out.println("received message: " + message);
+        //System.out.println("Received raw message: " + message);
         KrakenResponseJson myObject = gson.fromJson(message, KrakenResponseJson.class);
-        System.out.println(myObject.toString());
         KrakenResponseJson.Data data = myObject.getData().get(0);
 
+        // Benchmarking performance start
         if (data.getBids() != null) {
             for (KrakenResponseJson.Order order : data.getBids()) {
-                book.add("0", "B", order.getPrice(), order.getQuantity());
+                //book.add("0", "B", order.getPrice(), order.getQuantity());
+                bookTreeMap.add("B", order.getPrice(), order.getQuantity());
             }
         }
-
         if (data.getAsks() != null) {
             for (KrakenResponseJson.Order order : data.getAsks()) {
-                book.add("0", "S", order.getPrice(), order.getQuantity());
+                //book.add("0", "S", order.getPrice(), order.getQuantity());
+                bookTreeMap.add("S", order.getPrice(), order.getQuantity());
             }
         }
+        // Benchmarking performance end
 
-        // Sanity check 1: at least one bid and ask present
-        OrdersAtPrice bestBids = book.bidsByPrice;
-        OrdersAtPrice bestAsks = book.bidsByPrice;
-        if (bestBids == null && bestAsks == null) {
+        // Sanity check 1: at least one bid and 1 ask present
+        Double bestBid = bookTreeMap.getBestBid(); // -1.0 if no bid
+        Double bestAsk = bookTreeMap.getBestAsk();
+        if (bestBid == -1.0 || bestAsk == 1.0) {
             // Do not throw exception, to prevent stopping the program.
-            System.out.println("No bids and ask");
+            System.out.println("Error: Do not have at least 1 bid or 1 ask.");
         }
 
         // Sanity check 2: highest bid < lowest ask
-        System.out.println("Sanity Check to ensure highest bid < lowest ask");
-        if (book.bidsByPrice != null && book.asksByPrice != null) {
-            Double bestBid = book.bidsByPrice.price;
-            Double bestAsk = book.asksByPrice.price;
-            System.out.println("Best Bid:" + bestBid + " " + "Best Ask:" + bestAsk);
+        if (bestBid != -1.0 && bestAsk != -1.0) {
             if (bestBid > bestAsk) {
                 // Do not throw exception, to prevent stopping the program.
-                System.out.println("Error, bestBid > bestAsk");
+                System.out.println("Error, bestBid > bestAsk for Orderbook");
             }
         }
 
-        if (data.getTimestamp() != null) {
+        if (data.getTimestamp() != null) { // Only update candle for 'tick update' messages
             Instant timestamp = Instant.parse(data.getTimestamp());
             Instant truncatedTimestamp = timestamp.truncatedTo(ChronoUnit.MINUTES);
             String truncatedTimestampStr = truncatedTimestamp.toString();
 
             Candle candle = candles.computeIfAbsent(truncatedTimestampStr, k -> new Candle(truncatedTimestampStr));
 
-            Double currMidPrice = (book.asksByPrice.price + book.bidsByPrice.price) / 2;
+            double currMidPrice = (bestAsk + bestBid) / 2;
 
-            if (candle.getOpen() == -1.0) {
-                // only the first tick of this minute should update this
+            if (candle.getOpen() == -1.0) { // only the first tick of this minute should update this
                 candle.setOpen(currMidPrice);
             }
             candle.setHigh(Math.max(candle.getHigh(), currMidPrice));
@@ -100,17 +96,8 @@ public class KrakenClient extends WebSocketClient {
             candle.setClose(currMidPrice);
             candle.setTicks(candle.getTicks()+1);
         }
-
-        //updateCandle(book);
-        //book.add(); //    public void add(String orderId, String side, Double price, Double volume) {
-        //System.out.println(book.toString());
-        System.out.println("================ \n");
+        //System.out.println(bookTreeMap.toString());
     }
-
-//    private void updateCandle(Book book) {
-//        Candle candle = candles.computeIfAbsent(symbol, k -> new Candle(currentMinute));
-//
-//    }
 
     @Override
     public void onMessage(ByteBuffer message) {
@@ -127,8 +114,8 @@ public class KrakenClient extends WebSocketClient {
         String subscriptionMessage = "{\"method\": \"subscribe\", \"params\": {\"channel\": \"book\", \"symbol\": [\"ALGO/USD\"]}}";
 
         try {
-            // Create a WebSocket client (optional Draft configuration)
-            WebSocketClient client = new KrakenClient(new URI("wss://ws.kraken.com/v2")); // or new EmptyClient(new URI("wss://ws.kraken.com/v2"), new Draft_6455());
+            // Create a WebSocket client
+            WebSocketClient client = new KrakenClient(new URI("wss://ws.kraken.com/v2"));
 
             // Connect to the WebSocket server
             client.connectBlocking();
@@ -139,21 +126,16 @@ public class KrakenClient extends WebSocketClient {
                 System.out.println("Sent Subscription Message: " + subscriptionMessage);
             }
 
-//            // Keep the main thread alive while the connection is open
-//            while (client.isOpen()) {
-//                Thread.sleep(1000); // Check connection status periodically
-//            }
-
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
-                // Your code to be executed every minute
-                System.out.println("This task runs every minute.");
-
+                System.out.println("===================================");
+                System.out.println("Printing all 1m candles every 15s");
                 for (Map.Entry<String, Candle> entry : candles.entrySet()) {
                     System.out.println(entry.getValue().toString());
                 }
-
-            }, 0, 1, TimeUnit.MINUTES);
+                System.out.println("End of candles. Next candles printing in 15s.");
+                System.out.println("===================================");
+            }, 0, 15, TimeUnit.SECONDS);
 
 
         } catch (Exception e) {

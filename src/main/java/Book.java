@@ -26,13 +26,6 @@ public class Book {
             OrdersAtPrice newOrdersAtPrice = new OrdersAtPrice(order.side, order.price, order, null, null);
             addOrdersAtPrice(newOrdersAtPrice);
         } else {
-            // TODO need to change because there is no longer a linked list, changed already
-
-//            Order firstOrder = ordersAtPrice.firstOrder;
-//            firstOrder.prevOrder.nextOrder = order;
-//            order.prevOrder = firstOrder.prevOrder;
-//            order.nextOrder = firstOrder;
-//            firstOrder.prevOrder = order;
             order.nextOrder = order.prevOrder = order;
             if (order.volume == 0) {
                 removeOrder(order);
