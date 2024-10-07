@@ -79,9 +79,9 @@ public class KrakenClient extends WebSocketClient {
 
         // Sanity check 2: highest bid < lowest ask
         if (bestBid != -1.0 && bestAsk != -1.0) {
-            if (bestBid > bestAsk) {
+            if (bestBid >= bestAsk) {
                 // Do not throw exception, to prevent stopping the program.
-                System.out.println("Error, bestBid > bestAsk for Orderbook");
+                System.out.println("Error, bestBid >= bestAsk for Orderbook");
             }
         }
 
@@ -132,9 +132,10 @@ public class KrakenClient extends WebSocketClient {
         // Define the subscription message in JSON format
         String subscriptionMessage = "{\"method\": \"subscribe\", \"params\": {\"channel\": \"book\", \"symbol\": [\"ALGO/USD\"]}}";
 
-        Producer<String, String> producer = initiateKafkaProducer();
-        AtomicReference<ProducerRecord<String, String>> record = new AtomicReference<>(new ProducerRecord<>("1m_Candle", "key", "First kafka produced message"));
-        producer.send(record.get());
+        // [Bonus task] - remove commented lines to set up kafka publisher
+        //Producer<String, String> producer = initiateKafkaProducer();
+        //AtomicReference<ProducerRecord<String, String>> record = new AtomicReference<>(new ProducerRecord<>("1m_Candle", "key", "First kafka produced message"));
+        //producer.send(record.get());
 
         try {
             // Create a WebSocket client
@@ -159,8 +160,9 @@ public class KrakenClient extends WebSocketClient {
                 }
                 sb.append("End of candles. Next candles printing in 15s." + '\n');
                 sb.append("===================================" + '\n');
-                record.set(new ProducerRecord<>("1m_Candle", "key", sb.toString()));
-                producer.send(record.get());
+                // [Bonus task] - remove 2 commented lines to publish to kafka
+                //record.set(new ProducerRecord<>("1m_Candle", "key", sb.toString()));
+                //producer.send(record.get());
                 System.out.println(sb.toString());
                 sb.setLength(0); // clear string buffer cache, reuse object, reduce GC.
             }, 0, 15, TimeUnit.SECONDS);

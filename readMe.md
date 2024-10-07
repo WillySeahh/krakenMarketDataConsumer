@@ -1,43 +1,81 @@
 # Candle 1m Problem
 
 ## Assumptions / Important Context
-1. Assume only 1 symbol/trading pair to build the orderbook and 1m candle. Chosen: **ALGO/USD**
+1. Used only 1 symbol/trading pair to build the orderbook and 1m candle. Chosen: **ALGO/USD**
 2. Used Kraken's Spot Websocket API v2 (https://docs.kraken.com/api/docs/websocket-v2/book/)
 3. Assumed that the response received has not been tampered with (did not perform CRC checksum on validity of packet)
-4. Since the response of the Kraken uses time format "2022-12-25T09:30:59.123456Z", when we refer to time we also use
+   and **no packet drops**.
+   - Packet drops happens once in awhile, and this may lead to bestBid >= bestAsk. 
+4. Response of the Kraken uses time format "2022-12-25T09:30:59.123456Z", when we refer to time we also use
 the same format. (Not in epoch)
    
 5. Upon starting the program, we have a Scheduler that runs once every 15s that prints out all the 1m candle. 
 The first time it runs there is no candle output as the book is still building.
+Afterwards it should like something like this 
    
-Else it should like something like this
-
 > ===================================     
 Printing all 1m candles every 15s       
 Candle{timestamp=2024-10-05T16:38:00Z, open=0.126090, high=0.126105, low=0.126020, close=0.126080, ticks=205}              
 Candle{timestamp=2024-10-05T16:37:00Z, open=0.126185, high=0.126300, low=0.126090, close=0.126090, ticks=361}       
-Candle{timestamp=2024-10-05T16:36:00Z, open=0.126485, high=0.126485, low=0.126185, close=0.126185, ticks=429}       
-Candle{timestamp=2024-10-05T16:35:00Z, open=0.126380, high=0.126495, low=0.126380, close=0.126485, ticks=333}       
-Candle{timestamp=2024-10-05T16:34:00Z, open=0.126380, high=0.126380, low=0.126380, close=0.126380, ticks=11}        
+...      
 End of candles. Next candles printing in 15s.       
 ===================================     
 
-6. Entry point of application is: **KrakenClient#main()**
-7. Used Maven 3.6.3, Java Azul Zulu 17.0.12, required dependencies are in pom.xml
-8. Github Repo: https://github.com/WillySeahh/gsrTest 
+6. Used Maven 3.6.3, Java Azul Zulu 17.0.12, required dependencies are in pom.xml
+7. Github Repo: https://github.com/WillySeahh/gsrTest 
+8. Intentionally left some print statements, but commented out, to assist tracking of incoming message and orderbook state
+
+## Results
+
+### Completed main task and expected result
+In `KrakenClient.main` hit Run. 
+Should print out 1m candles every 15s
+
+> New connection opened    
+Sent Subscription Message: {"method": "subscribe", "params": {"channel": "book", "symbol": ["ALGO/USD"]}}      
+===================================    
+Printing all 1m candles every 15s      
+End of candles. Next candles printing in 15s.      
+===================================    
+Error: Do not have at least 1 bid or 1 ask.     
+===================================    
+Printing all 1m candles every 15s      
+Candle{timestamp=2024-10-07T12:31:00Z, open=0.127100, high=0.127115, low=0.127010, close=0.127010, ticks=118}     
+End of candles. Next candles printing in 15s.      
+===================================    
+===================================    
+Printing all 1m candles every 15s      
+Candle{timestamp=2024-10-07T12:32:00Z, open=0.127010, high=0.127010, low=0.127010, close=0.127010, ticks=3}    
+Candle{timestamp=2024-10-07T12:31:00Z, open=0.127100, high=0.127115, low=0.127010, close=0.127010, ticks=145}     
+End of candles. Next candles printing in 15s.      
+===================================    
+
+The first `Error: Do not have at least 1 bid or 1 ask.` can be ignored as the orderbook initially has not bid and ask as
+it is being built. 
+
+### Completed bonus task and expected result
+`KrakenClient` will continue printing the candles once every 15s, as mentioned above, **but will also
+publish `candles` in string format on `localhost:9092` and topic `1m_Candle`**.
+
+1. In `KrakenClient` search for `[Bonus task]` and remove the 5 commented out lines to set up Kafka Publisher
+2. Download apache kafka, and start `zookeper-server-start.sh` passing in zookeper.properties files -> then start another terminal window
+   -> start `kafka-server-start.sh` passing in server.properties files. Ensure it is started on localhost:9092
+   
+3. Run `KrakenClient.main` and `KafkaConsumerClass.main`
+4. Expected to see the same candle being printed once every 15s. 
 
 
-## Task
-There are 3 main sub problem here, and I will go through how I tackled each sub problem below.
+## Indepth explanation of code
+There are 4 main sub problem here, and I will go through how I tackled each sub problem below.
 
 - Integrate with an exchange (we recommend Kraken) to get tick level data using Websockets
   
 - Using snapshot and delta messages, build the correct view of the tick level orderbook in memory
-  - Benchmarking in performance - Done below
+  - **Benchmarking in performance** - Done and explained below
    
 - Use this tick level order book data to compute 1m candle data and log the output to console
   
-- Bonus task: publishing 1m candle to kafka, polling and printing it. - Done below
+- Bonus task: publishing 1m candle to kafka, polling and printing it. - Done and explained below
 
 
 ## Integrate with an exchange to get tick level data using Websockets
@@ -69,9 +107,8 @@ and then the subsequent updates will update tick by tick.
 View the orderbook status using `System.out.println(book.toString());`
 
 ### Performed benchmarking on how long it needs to process each update tick
-For HFT/Market makers, latency is crucial and bench marking have to be done. 
+For HFT/Market makers, latency is crucial and benchmarking have to be done. 
 Hence, I performed a simple performance benchmarking. 
-
 
 I performed benchmarking (locally) over 15min intervals and found that the
 
@@ -123,6 +160,7 @@ The printed candles should be the same as the one in `KrakenClient` run tab, it 
 1. Did perform simple sanity checks such as:
     - Ensure that highest bid < lowest ask when building the tick level order book
         - When this happens, log it out instead of throwing an exception.
+        - May occur once in awhile due to packet drops. 
 2. There’s always at least one bid and ask present
     - This should only happens once, upon the very start of the program where the book
       is not built yet.
