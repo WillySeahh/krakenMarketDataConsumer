@@ -22,8 +22,7 @@ End of candles. Next candles printing in 15s.
 ===================================     
 
 6. Used Maven 3.6.3, Java Azul Zulu 17.0.12, required dependencies are in pom.xml
-7. Github Repo: https://github.com/WillySeahh/gsrTest 
-8. Intentionally left some print statements, but commented out, to assist tracking of incoming message and orderbook state
+7. Intentionally left some print statements, but commented out, to assist tracking of incoming message and orderbook state
 
 ## Results
 
